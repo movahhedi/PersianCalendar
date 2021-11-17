@@ -462,7 +462,7 @@ function mds_to_gregorian($m_y, $j_m, $m_d) {
 	$m_day_no += $jd;
 
 	$g_day_no = $m_day_no + 79;
-
+	
 	$gy = 1600 + 400 * div($g_day_no, 146097); /* 146097 = 365*400 + 400/4 - 400/100 + 400/400 */
 	$g_day_no = $g_day_no % 146097;
 
