@@ -1,24 +1,25 @@
 <?php
-echo PersianCalendar::date(PersianCalendar::DT_FORMAT_DB_DATETIME, time(), false, 3, 30);
 
  /**
  * Persian Calendar - Created by Shahab Movahhedi
  *
  * Persian Calendar
  * Created by Shahab Movahhedi
- * shmovahhedi.com
- * s@shmovahhedi.com
  *
  * @author     Shahab Movahhedi <s@shmovahhedi.com>
+ * @link       https://shmovahhedi.com
  * @copyright  2021 Shahab Movahhedi
  * @license    GNU GPLv3.0
  * @version    Release: 1.0.0
- * @link       https://shmovahhedi.com
  * @since      Class available since Release 1.0.0
  */
 class PersianCalendar {
 
 	public const DT_FORMAT_DB_DATETIME = "Y-m-d H:i:s";
+
+	public const TIMESTAMP = 0;
+	public const GREGORIAN = 1;
+	public const PERSIAN = 2;
 
 	public const PERSIAN_MONTHS = array(
 		1 => array(
@@ -165,7 +166,11 @@ class PersianCalendar {
 		"9" => "&#1785;"
 	);
 
-	public static function FormatTimestamp($format, $ts = 0, $persianNumber = false, $tz_h = 0, $tz_m = 0) {
+	public static function MasterConvert($inputType = self::TIMESTAMP, $outputType = self::PERSIAN, $input = "now") {
+
+	}
+
+	public static function TimestampToFormattedPersian($format, $ts = 0, $persianNumber = false, $tz_h = 0, $tz_m = 0) {
 		if ( ! $ts || $ts == "now") $ts = time();
 
 		// TimeZone stuff
@@ -173,7 +178,7 @@ class PersianCalendar {
 		$ts += ($tz_h * 3600) + ($tz_m * 60);
 
 		// Getting Persian Year, Month, Day & Day-In-Year
-		list($g_y, $g_m, $g_d, $h, $min, $s) = self::TimestampToGregorian($ts);
+		list($g_y, $g_m, $g_d, $h, $min, $s) = self::FromTimestamp($ts, self::GREGORIAN);
 		list($p_y, $p_m, $p_d, $h, $min, $s, $p_dayinyear) = self::GregorianToPersian($g_y, $g_m, $g_d, $h, $min, $s);
 
 		// Persian Weekday number starting from 1 (Saturday)
@@ -224,22 +229,7 @@ class PersianCalendar {
 			else $result .= $i;
 		}
 
-		return $persianNumber ? PersianCalendar::ConvertToPersianNumbers($result) : $result;
-	}
-
-	public static function ConvertToPersianNumbers($input) {
-		$input = str_split($input);
-		foreach ($input as &$i) $i = self::PERSIAN_NUMBERS[$i] ?? $i;
-		unset($i);
-		return implode("", $input);
-	}
-
-	public static function IsLeapYear($year) {
-		return $year % 4 == 0 && $year % 100 != 0;
-	}
-
-	public static function IsPersianDateValid($year, $month, $day) {
-		return ($year > 0 && $month > 0 && $day > 0 && $month <= 12 && ((self::PERSIAN_MONTHS[$month]["DaysInMonth"] >= $day) || (IsLeapYear($year) && $month == 12 && $day == 30)));
+		return $persianNumber ? self::ConvertToPersianNumbers($result) : $result;
 	}
 
 	/**
@@ -251,80 +241,151 @@ class PersianCalendar {
 	 */
 	public static function PersianToTimestamp($p_y, $p_m, $p_d, $h, $min, $s) {
 		list($g_y, $g_m, $g_d) = self::PersianToGregorian($p_y, $p_m, $p_d);
-		return self::GregorianToTimestamp($g_y, $g_m, $g_d, $h, $min, $s);
+		return self::FromNumeralGregorian($g_y, $g_m, $g_d, $h, $min, $s, "@");
 	}
 
-	/**
-	 * Converts 
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @return	array	Persian Year, Month, Day and Day-In-Year
-	 */
-	public static function TimestampToPersian($ts) {
-		list($g_y, $g_m, $g_d, $g_h, $g_min, $g_s) = self::TimestampToGregorian($ts);
-		return self::GregorianToPersian($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+	public static function FromTimestamp($ts, $outputType = self::TIMESTAMP, $outputFormat = null) {
+		if ($outputType == self::TIMESTAMP || (isset($outputFormat) && $outputFormat && $outputFormat == "@")) return $ts;
+		if ($outputType == self::PERSIAN && (isset($outputFormat) && $outputFormat && $outputFormat != "@")) return self::TimestampToFormattedPersian($outputFormat, $ts);
+
+		$dt = new DateTime('@' . $ts);
+		$g_y = $dt->format('Y');
+		$g_m = $dt->format('n');
+		$g_d = $dt->format('j');
+		$g_h = $dt->format('G');
+		$g_min = intval($dt->format('i'));
+		$g_s = intval($dt->format('s'));
+
+		if ($outputType == self::GREGORIAN) {
+			if (isset($outputFormat) && $outputFormat) return $dt->format($outputFormat);
+			else return array($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		}
+		else return self::GregorianToPersian($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
 	}
 
-	/**
-	 * Converts Timestamp To Gregorian
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @param	int		$ts		The Unix Timestamp
-	 * @return	array	Gregorian Year, Month, Day, Hour, Minutes and Seconds
-	 */
-	public static function TimestampToGregorian($ts) {
-		$timestamp = strtotime('Mon, 12 Dec 2011 21:17:52 +0000');
-		$dt = new DateTime('@' . $timestamp);
+	public static function FromNumeralGregorian($g_y = 0, $g_m = 0, $g_d = 0, $g_h = 0, $g_min = 0, $g_s = 0, $outputType = self::TIMESTAMP, $outputFormat = null, $is_dst = -1) {
+		$NeedsFormatting = (isset($outputFormat) && $outputFormat && $outputFormat != "@");
+
+		// To Timestamp
+		if ($outputType == self::TIMESTAMP || (isset($outputFormat) && $outputFormat && $outputFormat == "@")) {
+			return mktime($g_h, $g_min, $g_s, $g_m, $g_d, $g_y, $is_dst);
+		}
+
+		// To Numeral Persian
+		if ($outputType == self::PERSIAN && ! $NeedsFormatting) {
+			return self::GregorianToPersian($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		}
+
+		// To Formatted Persian
+		if ($outputType == self::PERSIAN && $NeedsFormatting) {
+			$dt = new DateTime();
+			$dt->setDate($g_y, $g_m, $g_d);
+			$dt->setTime($g_h, $g_min, $g_s);
+			return self::TimestampToFormattedPersian($outputFormat, $dt->getTimestamp());
+		}
+
+		// To Numeral Gregorian
+		if ($outputType == self::GREGORIAN && ! $NeedsFormatting) {
+			return array($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		}
+
+		// To Formatted Gregorian
+		if ($outputType == self::GREGORIAN && $NeedsFormatting) {
+			$dt = new DateTime();
+			$dt->setDate($g_y, $g_m, $g_d);
+			$dt->setTime($g_h, $g_min, $g_s);
+			return $dt->format($outputFormat);
+		}
+
+		// FallBack to Timestamp
+		return mktime($g_h, $g_min, $g_s, $g_m, $g_d, $g_y, $is_dst);
+	}
+
+	public static function FromTextualGregorian($input = "now", $outputType = self::TIMESTAMP, $outputFormat = null, $inputFormat = null) {
+		$NeedsFormatting = (isset($outputFormat) && $outputFormat && $outputFormat != "@");
+
+		// To Timestamp
+		if ($outputType == self::TIMESTAMP || (isset($outputFormat) && $outputFormat && $outputFormat == "@")) {
+			return strtotime($input);
+		}
 		
-		$g_y = date('Y', $ts);
-		$g_m = date('n', $ts);
-		$g_d = date('j', $ts);
-		$g_h = date('G', $ts);
-		$g_min = date('i', $ts);
-		$g_s = date('s', $ts);
-		return array($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		if (isset($inputFormat) && $inputFormat) {
+			$dt = new DateTime();
+			$dt->createFromFormat($inputFormat, $input);	
+		}
+		else $dt = new DateTime($input);
+
+		// To Numeral Persian
+		if ($outputType == self::PERSIAN && ! $NeedsFormatting) {
+			$g_y = $dt->format('Y');
+			$g_m = $dt->format('n');
+			$g_d = $dt->format('j');
+			$g_h = $dt->format('G');
+			$g_min = intval($dt->format('i'));
+			$g_s = intval($dt->format('s'));
+
+			return self::GregorianToPersian($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		}
+
+		// To Formatted Persian
+		if ($outputType == self::PERSIAN && $NeedsFormatting) {
+			return self::TimestampToFormattedPersian($outputFormat, $dt->getTimestamp());
+		}
+
+		// To Numeral Gregorian
+		if ($outputType == self::GREGORIAN && ! $NeedsFormatting) {
+			$g_y = $dt->format('Y');
+			$g_m = $dt->format('n');
+			$g_d = $dt->format('j');
+			$g_h = $dt->format('G');
+			$g_min = intval($dt->format('i'));
+			$g_s = intval($dt->format('s'));
+
+			return array($g_y, $g_m, $g_d, $g_h, $g_min, $g_s);
+		}
+
+		// To Formatted Gregorian
+		if ($outputType == self::GREGORIAN && $NeedsFormatting) {
+			return $dt->format($outputFormat);
+		}
+
+		// FallBack to Timestamp
+		return strtotime($input);
+	}
+	
+	public static function FromNumeralPersian($p_y = 0, $p_m = 0, $p_d = 0, $p_h = 0, $p_min = 0, $p_s = 0, $outputType = self::TIMESTAMP, $outputFormat = null, $is_dst = -1) {
+		$NeedsFormatting = (isset($outputFormat) && $outputFormat && $outputFormat != "@");
+		
+		// To Timestamp
+		if ($outputType == self::TIMESTAMP || (isset($outputFormat) && $outputFormat && $outputFormat == "@")) {
+			return self::PersianToTimestamp($p_y, $p_m, $p_d, $p_h, $p_min, $p_s);
+		}
+		
+		// To Numeral Persian
+		if ($outputType == self::PERSIAN && ! $NeedsFormatting) {
+			return array($p_y, $p_m, $p_d, $p_min, $p_s);
+		}
+
+		// To Formatted Persian
+		// if ($outputType == self::PERSIAN && $NeedsFormatting) {
+		// 	return array($p_y, $p_m, $p_d, $p_min, $p_s);
+		// }
+
+		// To Numeral Gregorian
+		if ($outputType == self::GREGORIAN && ! $NeedsFormatting) {
+			return self::PersianToGregorian($p_y, $p_m, $p_d);
+		}
+
+		// To Formatted Gregorian
+		if ($outputType == self::GREGORIAN && $NeedsFormatting) {
+			list($g_y, $g_m, $g_d, $g_min, $g_s) = self::PersianToGregorian($p_y, $p_m, $p_d, $p_min, $p_s);
+			return self::FromNumeralGregorian($g_y, $g_m, $g_d, $g_min, $g_s);
+		}
+
+		// FallBack to Timestamp
+		return self::PersianToTimestamp($p_y, $p_m, $p_d, $p_h, $p_min, $p_s);
 	}
 
-	/**
-	 * Converts Gregorian To Timestamp
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @see mktime
-	 * @param	int		$ts		The Unix Timestamp
-	 * @return	array	Gregorian Year, Month, Day, Hour, Minutes and Seconds
-	 */
-	public static function GregorianToTimestamp($g_y_OR_ts = 0, $g_m = 0, $g_d = 0, $g_h = 0, $g_min = 0, $g_s = 0, $is_dst = -1) {
-		if (is_int($g_y_OR_ts)) return mktime($g_y_OR_ts, $g_min, $g_s, $g_m, $g_d, $g_y_OR_ts, $is_dst);
-		else return strtotime($g_y_OR_ts);
-	}
-
-	/**
-	 * Converts Gregorian To Timestamp
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @see mktime
-	 * @param	int		$ts		The Unix Timestamp
-	 * @return	array	Gregorian Year, Month, Day, Hour, Minutes and Seconds
-	 */
-	public static function TextualGregorianToTimestamp($g_y_OR_ts = 0, $g_m = 0, $g_d = 0, $g_h = 0, $g_min = 0, $g_s = 0, $is_dst = -1) {
-		if (is_int($g_y_OR_ts)) return mktime($g_y_OR_ts, $g_min, $g_s, $g_m, $g_d, $g_y, $is_dst);
-		else return strtotime($g_y_OR_ts);
-	}
-
-	/**
-	 * Converts Gregorian to Persian
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @param	int $j_y	Gregorian Year
-	 * @param	int $j_y	Gregorian Month
-	 * @param	int $j_y	Gregorian Day
-	 * @return	array	Persian Year, Month, Day and Day-In-Year
-	 */
 	public static function GregorianToPersian($g_y, $g_m, $g_d, $h = 0, $min = 0, $s = 0) {
 		$g_days_in_month = array(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 		$j_days_in_month = array(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29);
@@ -361,19 +422,9 @@ class PersianCalendar {
 		$jm = $i + 1;
 		$jd = $j_day_no + 1;
 
-		return array($jy, $jm, $jd, $h = 0, $min = 0, $s = 0, $j_all_days);
+		return array($jy, $jm, $jd, $h, $min, $s, $j_all_days);
 	}
 
-	/**
-	 * Converts Persian to Gregorian
-	 *
-	 * @author	Shahab Movahhedi
-	 * @access	public
-	 * @param	int $j_y	Persian Year
-	 * @param	int $j_y	Persian Month
-	 * @param	int $j_y	Persian Day
-	 * @return	array	Gregorian Year, Month and Day
-	 */
 	public static function PersianToGregorian($j_y, $j_m, $j_d, $h = 0, $min = 0, $s = 0) {
 		$g_days_in_month = array(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 		$j_days_in_month = array(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29);
@@ -415,17 +466,38 @@ class PersianCalendar {
 		$gm = $i + 1;
 		$gd = $g_day_no + 1;
 
-		return array($gy, $gm, $gd, $h = 0, $min = 0, $s = 0);
+		return array($gy, $gm, $gd, $h, $min, $s);
+	}
+
+	public static function ConvertToPersianNumbers($input) {
+		$input = str_split($input);
+		foreach ($input as &$i) $i = self::PERSIAN_NUMBERS[$i] ?? $i;
+		unset($i);
+		return implode("", $input);
+	}
+
+	public static function IsPersianLeapYear($year) {
+		return $year % 4 == 0 && $year % 100 != 0;
+	}
+
+	public static function IsPersianDateValid($year, $month, $day) {
+		return ($year > 0 && $month > 0 && $day > 0 && $month <= 12 && ((self::PERSIAN_MONTHS[$month]["DaysInMonth"] >= $day) || (IsLeapYear($year) && $month == 12 && $day == 30)));
 	}
 
 	// Function Aliases
 	public static function date(...$args) {
-		return self::FormatTimestamp(...$args);
+		return self::TimestampToFormattedPersian(...$args);
 	}
 	public static function p2g(...$args) {
 		return self::PersianToGregorian(...$args);
 	}
 	public static function g2p(...$args) {
 		return self::GregorianToPersian(...$args);
+	}
+	public static function TimestampToPersian($ts) {
+		return self::FromTimestamp($ts, self::PERSIAN);
+	}
+	public static function TimestampToGregorian($ts) {
+		return self::FromTimestamp($ts, self::GREGORIAN);
 	}
 }
