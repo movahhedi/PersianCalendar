@@ -1,5 +1,8 @@
 <?php
 date_default_timezone_set("Asia/Tehran");
+var_dump(PersianCalendar::PersianToGregorian(1400,9,20,1,10,30));
+var_dump(PersianCalendar::GregorianToPersian(2021,12,11,1,10,30));
+/*
 echo PersianCalendar::FromNumeralPersian(1400,8,28,1,10,30, PersianCalendar::GREGORIAN, PersianCalendar::DT_FORMAT_DB_DATETIME);
 echo "<br/>";
 PersianCalendar::p2g(1400,8,28,1,10,30, PersianCalendar::GREGORIAN, PersianCalendar::DT_FORMAT_DB_DATETIME);
@@ -10,7 +13,7 @@ echo PersianCalendar::FromTextualGregorian("@" . time(), PersianCalendar::TIMEST
 echo "<br/>";
 echo PersianCalendar::FromNumeralPersian(1400,8,28,1,10,30, PersianCalendar::GREGORIAN, PersianCalendar::DT_FORMAT_DB_DATETIME);
 var_dump(PersianCalendar::FromNumeralPersian(1400,8,28,1,10,30, PersianCalendar::GREGORIAN));
-echo "<br/>";
+echo "<br/>";*/
 // echo PersianCalendar::date(PersianCalendar::DT_FORMAT_DB_DATETIME, time(), false, 3, 30);
 
  /**
@@ -179,9 +182,11 @@ class PersianCalendar {
 		"9" => "&#1785;"
 	);
 
-	public static function MasterConvert($inputType = self::TIMESTAMP, $outputType = self::PERSIAN, $input = "now") {
-
+	public static function IsGregorianLeapYear($y = 0) {
+		return (( ! ($y % 100)) ? ( ! ($y % 400)) : ( ! ($y % 4)));
 	}
+
+	public static function MasterConvert($inputType = self::TIMESTAMP, $outputType = self::PERSIAN, $input = "now") { }
 
 	public static function TimestampToFormattedPersian($format, $ts = 0, $persianNumber = false, $tz_h = 0, $tz_m = 0) {
 		if ( ! $ts || $ts == "now") $ts = time();
@@ -422,7 +427,7 @@ class PersianCalendar {
 			$jy += floor(($j_day_no - 1) / 365);
 			$j_day_no = ($j_day_no - 1) % 365;
 		}
-		$j_all_days = $j_day_no+1;
+		$j_all_days = $j_day_no + 1;
 
 		for ($i = 0; $i < 11 && $j_day_no >= $j_days_in_month[$i]; $i++)
 			$j_day_no -= $j_days_in_month[$i];
@@ -468,13 +473,14 @@ class PersianCalendar {
 			$gy += floor($g_day_no / 365);
 			$g_day_no = $g_day_no % 365;
 		}
+		$g_all_days = $g_day_no + 1;
 		for ($i = 0; $g_day_no >= $g_days_in_month[$i] + ($i == 1 && $leap); $i++)
 			$g_day_no -= $g_days_in_month[$i] + ($i == 1 && $leap);
 
 		$gm = $i + 1;
 		$gd = $g_day_no + 1;
 
-		return array($gy, $gm, $gd, $h, $min, $s);
+		return array($gy, $gm, $gd, $h, $min, $s, $g_all_days);
 	}
 
 	public static function ConvertToPersianNumbers($input) {
